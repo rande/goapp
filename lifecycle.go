@@ -10,10 +10,10 @@
 package goapp
 
 import (
-	"errors"
-	"fmt"
-	"runtime/debug"
-	"sync"
+"errors"
+"fmt"
+"runtime/debug"
+"sync"
 )
 
 const (
@@ -24,61 +24,20 @@ const (
 	Exit     = 50 // Exit the program
 )
 
-// The structure contains all services build by the AppFunc function, the service is initialized when get Get
-// method is called.
-type App struct {
-	state    int
-	values   map[string]AppFunc     // contains the original closure to generate the service
-	services map[string]interface{} // contains the instantiated services
-}
-
-type AppFunc func(app *App) interface{}
-
-func (app *App) Set(name string, f AppFunc) {
-	if _, ok := app.services[name]; ok {
-		panic("Cannot overwrite initialized service")
-	}
-
-	app.values[name] = f
-}
-
-func (app *App) Get(name string) interface{} {
-	if _, ok := app.values[name]; !ok {
-		panic(fmt.Sprintf("The service does not exist: %s", name))
-	}
-
-	if _, ok := app.services[name]; !ok {
-		app.services[name] = app.values[name](app)
-	}
-
-	return app.services[name]
-}
-
-func (app *App) GetString(name string) interface{} {
-	return app.Get(name).(string)
-}
-
-func NewApp() *App {
-	app := App{
-		services: make(map[string]interface{}),
-		values:   make(map[string]AppFunc),
-	}
-
-	return &app
-}
-
+// Represents the function used to change states or start a process.
+// Please note the process should be blocking as it will run inside a goroutine
 type LifecycleFun func(app *App) error
 
 type Lifecycle struct {
-	init     []LifecycleFun
-	register []LifecycleFun
-	config   []LifecycleFun
-	run      []LifecycleFun
-	exit     []LifecycleFun
-}
+		init     []LifecycleFun
+		register []LifecycleFun
+		config   []LifecycleFun
+		run      []LifecycleFun
+		exit     []LifecycleFun
+	}
 
 // register a new LifecycleFun function to a step
-func (l *Lifecycle) Add(t int, f LifecycleFun) {
+func (l *Lifecycle) add(t int, f LifecycleFun) {
 	switch t {
 	case Init:
 		l.init = append(l.init, f)
@@ -93,30 +52,45 @@ func (l *Lifecycle) Add(t int, f LifecycleFun) {
 	}
 }
 
+func (l *Lifecycle) Init(f LifecycleFun) {
+	l.add(Init, f)
+}
+
+func (l *Lifecycle) Register(f LifecycleFun) {
+	l.add(Register, f)
+}
+
+func (l *Lifecycle) Config(f LifecycleFun) {
+	l.add(Config, f)
+}
+
+func (l *Lifecycle) Run(f LifecycleFun) {
+	l.add(Run, f)
+}
+
+func (l *Lifecycle) Exit(f LifecycleFun) {
+	l.add(Exit, f)
+}
+
+func (l *Lifecycle) execute(fs []LifecycleFun, app *App) {
+	for _, f := range fs {
+		f(app)
+	}
+}
+
 // Start the different step, the each LifecycleFun defined in the run step will be started in a dedicated goroutine.
 // The Go function will exit the program
 func (l *Lifecycle) Go(app *App) int {
 
-	fmt.Printf(">>> GoApp vX.X\n")
-	fmt.Printf(">>> GoApp - Init\n")
 	app.state = Init
-	for _, f := range l.init {
-		f(app)
-	}
+	l.execute(l.init, app)
 
-	fmt.Printf(">>> GoApp - Register\n")
 	app.state = Register
-	for _, f := range l.register {
-		f(app)
-	}
+	l.execute(l.register, app)
 
-	fmt.Printf(">>> GoApp - Configuration\n")
 	app.state = Config
-	for _, f := range l.config {
-		f(app)
-	}
+	l.execute(l.config, app)
 
-	fmt.Printf(">>> GoApp - Run\n")
 	app.state = Run
 	var wg sync.WaitGroup
 
@@ -150,18 +124,13 @@ func (l *Lifecycle) Go(app *App) int {
 		err := <-c
 
 		if err != nil {
-			fmt.Printf(">>> GoApp - Error: %s\n", err)
+			fmt.Printf(">>> Error: %s\n", err)
 			hasError = true
 		}
 	}
 
-	fmt.Printf(">>> GoApp - Exit\n")
 	app.state = Exit
-	for _, f := range l.exit {
-		f(app)
-	}
-
-	fmt.Printf(">>> GoApp - done!\n")
+	l.execute(l.exit, app)
 
 	// check for errors
 	if hasError {
