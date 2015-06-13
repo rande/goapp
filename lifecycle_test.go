@@ -58,8 +58,8 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 
 	l.Init(func(app *App) error {
 		app.Set("hello", func(app *App) interface{} {
-				return "world"
-			})
+			return "world"
+		})
 
 		return nil
 	})
@@ -71,8 +71,8 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 		assert.Equal(t, hello, "world")
 
 		app.Set("testing", func(app *App) interface{} {
-				return t
-			})
+			return t
+		})
 
 		return nil
 	})
@@ -83,8 +83,8 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 		assert.Equal(t, tester, t)
 
 		app.Set("messages", func(app *App) interface{} {
-				return list.New()
-			})
+			return list.New()
+		})
 
 		return nil
 	})

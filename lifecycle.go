@@ -10,18 +10,20 @@
 package goapp
 
 import (
-"errors"
-"fmt"
-"runtime/debug"
-"sync"
+	"errors"
+	"fmt"
+	"runtime/debug"
+	"sync"
 )
 
 const (
-	Init     = 10 // Initialize application: register flags, no logic should be done here
-	Register = 20 // Register components that does not required configuration settings
-	Config   = 30 // Read configuration and defined main services from this configuration
-	Run      = 40 // Run the main program loop
-	Exit     = 50 // Exit the program
+	Init       = 10 // Initialize application: register flags, no logic should be done here
+	Register   = 20 // Register components that does not required configuration settings
+	Config     = 30 // Read configuration
+	Prepare    = 40 // Defined main services from configuration
+	Run        = 50 // Run the main program loop
+	Exit       = 60 // Exit the program
+	Terminated = 70 // Exit the program
 )
 
 // Represents the function used to change states or start a process.
@@ -29,12 +31,13 @@ const (
 type LifecycleFun func(app *App) error
 
 type Lifecycle struct {
-		init     []LifecycleFun
-		register []LifecycleFun
-		config   []LifecycleFun
-		run      []LifecycleFun
-		exit     []LifecycleFun
-	}
+	init     []LifecycleFun
+	register []LifecycleFun
+	config   []LifecycleFun
+	prepare  []LifecycleFun
+	run      []LifecycleFun
+	exit     []LifecycleFun
+}
 
 // register a new LifecycleFun function to a step
 func (l *Lifecycle) add(t int, f LifecycleFun) {
@@ -45,6 +48,8 @@ func (l *Lifecycle) add(t int, f LifecycleFun) {
 		l.register = append(l.register, f)
 	case Config:
 		l.config = append(l.config, f)
+	case Prepare:
+		l.prepare = append(l.prepare, f)
 	case Run:
 		l.run = append(l.run, f)
 	case Exit:
@@ -61,6 +66,10 @@ func (l *Lifecycle) Register(f LifecycleFun) {
 }
 
 func (l *Lifecycle) Config(f LifecycleFun) {
+	l.add(Config, f)
+}
+
+func (l *Lifecycle) Prepare(f LifecycleFun) {
 	l.add(Config, f)
 }
 
@@ -91,6 +100,9 @@ func (l *Lifecycle) Go(app *App) int {
 	app.state = Config
 	l.execute(l.config, app)
 
+	app.state = Prepare
+	l.execute(l.prepare, app)
+
 	app.state = Run
 	var wg sync.WaitGroup
 
@@ -101,11 +113,9 @@ func (l *Lifecycle) Go(app *App) int {
 
 		wg.Add(1)
 		go func(f LifecycleFun, c chan error) {
-
 			defer func() {
 				if r := recover(); r != nil {
 					message := fmt.Sprintf("Panic recovered, message=%s\n", r)
-
 					c <- errors.New(message + string(debug.Stack()[:]))
 				}
 
@@ -113,7 +123,6 @@ func (l *Lifecycle) Go(app *App) int {
 			}()
 
 			c <- f(app)
-
 		}(f, results[p])
 	}
 
@@ -131,6 +140,8 @@ func (l *Lifecycle) Go(app *App) int {
 
 	app.state = Exit
 	l.execute(l.exit, app)
+
+	app.state = Terminated
 
 	// check for errors
 	if hasError {
