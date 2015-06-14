@@ -3,10 +3,29 @@ package goapp
 import (
 	"container/list"
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 )
+
+func ExampleLifecycle_BasicUsage() {
+	l := NewLifecycle()
+
+	l.Run(func(app *App) error {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "Hello world")
+		})
+
+		http.ListenAndServe(":8080", nil)
+
+		return nil
+	})
+
+	os.Exit(l.Go(NewApp()))
+}
 
 func Test_LifeCycle_With_Success(t *testing.T) {
 	l := NewLifecycle()

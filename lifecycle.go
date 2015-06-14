@@ -87,8 +87,8 @@ func (l *Lifecycle) execute(fs []LifecycleFun, app *App) {
 	}
 }
 
-// Start the different step, the each LifecycleFun defined in the run step will be started in a dedicated goroutine.
-// The Go function will exit the program
+// Start the different step, each LifecycleFun defined in the "run" step will be started in a dedicated goroutine.
+// The Go function will return the exit code of the program
 func (l *Lifecycle) Go(app *App) int {
 
 	app.state = Init
