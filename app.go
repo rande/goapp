@@ -14,6 +14,15 @@ type App struct {
 
 type AppFunc func(app *App) interface{}
 
+func NewApp() *App {
+	app := App{
+		services: make(map[string]interface{}),
+		values:   make(map[string]AppFunc),
+	}
+
+	return &app
+}
+
 func (app *App) Set(name string, f AppFunc) {
 	if _, ok := app.services[name]; ok {
 		panic("Cannot overwrite initialized service")
@@ -38,12 +47,10 @@ func (app *App) GetString(name string) interface{} {
 	return app.Get(name).(string)
 }
 
-func NewApp() *App {
-	app := App{
-		services: make(map[string]interface{}),
-		values:   make(map[string]AppFunc),
-	}
-
-	return &app
+func (app *App) GetState() int {
+	return app.state
 }
 
+func (app *App) IsTerminated() bool {
+	return app.state == Terminated
+}
