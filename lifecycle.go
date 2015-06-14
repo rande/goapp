@@ -1,12 +1,13 @@
 // The package try to normalize how an application should start without
 // providing any convention about how each steps should be used.
 //
-// The process will go through 5 steps:
+// The process will go through 6 steps:
 //  - Init: Initialize application: register flags, no logic should be done here
 //  - Register : Register components that does not required configuration settings
-//  - Config   : Read configuration and defined main services from this configuration
-//  - Run      : Run the main program loop
-//  - Exit     : (not yet implemented
+//  - Config   : Read configuration
+//  - Prepare  : Defined main services from this configuration
+//  - Run      : Run the main program loop, each function will be run in a goroutine
+//  - Exit     : Register function call when the program will exit
 package goapp
 
 import (
