@@ -14,7 +14,7 @@ import (
 func ExampleLifecycle_BasicUsage() {
 	l := NewLifecycle()
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "Hello world")
 		})
@@ -30,7 +30,7 @@ func ExampleLifecycle_BasicUsage() {
 func Test_LifeCycle_With_Success(t *testing.T) {
 	l := NewLifecycle()
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 
 		return nil
 	})
@@ -43,7 +43,7 @@ func Test_LifeCycle_With_Success(t *testing.T) {
 func Test_LifeCycle_With_Panic(t *testing.T) {
 	l := NewLifecycle()
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		panic("take this !!")
 	})
 
@@ -55,15 +55,15 @@ func Test_LifeCycle_With_Panic(t *testing.T) {
 func Test_LifeCycle_With_Error(t *testing.T) {
 	l := NewLifecycle()
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		return nil
 	})
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		return errors.New("this is a error")
 	})
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		return errors.New("this is a second error")
 	})
 
@@ -108,7 +108,7 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 		return nil
 	})
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		messages := app.Get("messages").(*list.List)
 
 		messages.PushBack("Run1: sleep for 0.5s")
@@ -118,7 +118,7 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 		return nil
 	})
 
-	l.Run(func(app *App) error {
+	l.Run(func(app *App, state *GoroutineState) error {
 		messages := app.Get("messages").(*list.List)
 
 		messages.PushBack("Run2: sleep for 0.5s")
@@ -135,5 +135,48 @@ func Test_LifeCycle_Wait_Run(t *testing.T) {
 	messages := app.Get("messages").(*list.List)
 	assert.Equal(t, 4, messages.Len())
 
-	assert.Equal(t, r, 0) // an error is present
+	assert.Equal(t, r, 0) // an error is not present
+}
+
+func Test_LifeCycle_Stop_Channel(t *testing.T) {
+
+	l := NewLifecycle()
+
+	l.Config(func(app *App) error {
+		app.Set("messages", func(app *App) interface{} {
+			return list.New()
+		})
+
+		return nil
+	})
+
+	getExit := false
+
+	f := func(app *App, state *GoroutineState) error {
+		for {
+			select {
+			case <-state.In:
+				getExit = true
+				return nil
+
+			default:
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+	}
+
+	l.Run(f)
+	l.Run(f)
+
+	l.Run(func(app *App, state *GoroutineState) error {
+		time.Sleep(1000 * time.Millisecond)
+
+		state.Out <- 1
+
+		return nil
+	})
+
+	l.Go(NewApp())
+
+	assert.True(t, getExit) // an error is present
 }

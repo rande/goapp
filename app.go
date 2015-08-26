@@ -43,7 +43,7 @@ func (app *App) Get(name string) interface{} {
 	return app.services[name]
 }
 
-func (app *App) GetString(name string) interface{} {
+func (app *App) GetString(name string) string {
 	return app.Get(name).(string)
 }
 

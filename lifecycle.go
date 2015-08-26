@@ -13,6 +13,7 @@ package goapp
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"runtime/debug"
 	"sync"
 )
@@ -31,31 +32,39 @@ const (
 // Please note the process should be blocking as it will run inside a goroutine
 type LifecycleFun func(app *App) error
 
+type LifecycleRunFun func(app *App, state *GoroutineState) error
+
 type Lifecycle struct {
 	init     []LifecycleFun
 	register []LifecycleFun
 	config   []LifecycleFun
 	prepare  []LifecycleFun
-	run      []LifecycleFun
+	run      []LifecycleRunFun
 	exit     []LifecycleFun
 }
 
 // register a new LifecycleFun function to a step
-func (l *Lifecycle) add(t int, f LifecycleFun) {
-	switch t {
-	case Init:
-		l.init = append(l.init, f)
-	case Register:
-		l.register = append(l.register, f)
-	case Config:
-		l.config = append(l.config, f)
-	case Prepare:
-		l.prepare = append(l.prepare, f)
-	case Run:
+func (l *Lifecycle) add(t int, f interface{}) {
+	switch f := f.(type) {
+	case LifecycleRunFun:
 		l.run = append(l.run, f)
-	case Exit:
-		l.exit = append(l.exit, f)
+	case LifecycleFun:
+		switch t {
+		case Run:
+			panic("You must use a LifecycleRunFun type for the Run type")
+		case Init:
+			l.init = append(l.init, f)
+		case Register:
+			l.register = append(l.register, f)
+		case Config:
+			l.config = append(l.config, f)
+		case Prepare:
+			l.prepare = append(l.prepare, f)
+		case Exit:
+			l.exit = append(l.exit, f)
+		}
 	}
+
 }
 
 func (l *Lifecycle) Init(f LifecycleFun) {
@@ -74,7 +83,7 @@ func (l *Lifecycle) Prepare(f LifecycleFun) {
 	l.add(Config, f)
 }
 
-func (l *Lifecycle) Run(f LifecycleFun) {
+func (l *Lifecycle) Run(f LifecycleRunFun) {
 	l.add(Run, f)
 }
 
@@ -105,36 +114,60 @@ func (l *Lifecycle) Go(app *App) int {
 	l.execute(l.prepare, app)
 
 	app.state = Run
+
 	var wg sync.WaitGroup
 
-	results := make([]chan error, len(l.run)) // create a pool of channel to handle each return
-
+	// start a set of goroutine, and provide a GoroutingState struct to interact wih the In and Out channel
+	states := make([]*GoroutineState, len(l.run)) // create a pool of channel to handle message from tasks
 	for p, f := range l.run {
-		results[p] = make(chan error, 1)
+		states[p] = NewGoroutineState()
 
 		wg.Add(1)
-		go func(f LifecycleFun, c chan error) {
+
+		go func(f LifecycleRunFun, state *GoroutineState) {
 			defer func() {
 				if r := recover(); r != nil {
 					message := fmt.Sprintf("Panic recovered, message=%s\n", r)
-					c <- errors.New(message + string(debug.Stack()[:]))
+					state.Error = errors.New(message + string(debug.Stack()[:]))
 				}
 
 				wg.Done()
 			}()
 
-			c <- f(app)
-		}(f, results[p])
+			state.Error = f(app, state)
+		}(f, states[p])
 	}
+
+	// Start listenning to Out channel
+	go func(states []*GoroutineState) {
+		cases := make([]reflect.SelectCase, len(states))
+		for i, state := range states {
+			cases[i] = reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(state.Out),
+			}
+		}
+
+		chosen, _, _ := reflect.Select(cases)
+
+		fmt.Println("Sending exit signal to goroutine")
+		for pos, state := range states {
+			if pos == chosen {
+				continue
+			}
+
+			state.In <- 1
+		}
+	}(states)
 
 	wg.Wait()
 
 	hasError := false
-	for _, c := range results {
-		err := <-c
+	for _, state := range states {
 
-		if err != nil {
-			fmt.Printf(">>> Error: %s\n", err)
+		if state.Error != nil {
+
+			fmt.Printf(">>> Error: %s\n", state.Error)
 			hasError = true
 		}
 	}
@@ -157,7 +190,7 @@ func NewLifecycle() *Lifecycle {
 		init:     make([]LifecycleFun, 0),
 		register: make([]LifecycleFun, 0),
 		config:   make([]LifecycleFun, 0),
-		run:      make([]LifecycleFun, 0),
+		run:      make([]LifecycleRunFun, 0),
 		exit:     make([]LifecycleFun, 0),
 	}
 }
