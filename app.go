@@ -43,6 +43,16 @@ func (app *App) Get(name string) interface{} {
 	return app.services[name]
 }
 
+func (app *App) GetKeys() []string {
+	keys := make([]string, 0)
+
+	for k := range app.values {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
 func (app *App) GetString(name string) string {
 	return app.Get(name).(string)
 }

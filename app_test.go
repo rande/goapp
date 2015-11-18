@@ -69,3 +69,12 @@ func Test_NoReference(t *testing.T) {
 	u_r = app.Get("user.reference").(*User)
 	assert.Equal(t, "Fred", u_r.name)
 }
+
+func Test_GetKeys(t *testing.T) {
+	app := NewApp()
+	app.Set("user", func(app *App) interface{} { return nil })
+	app.Set("user.reference", func(app *App) interface{} { return nil })
+
+	assert.Contains(t, app.GetKeys(), "user")
+	assert.Contains(t, app.GetKeys(), "user.reference")
+}
