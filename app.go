@@ -31,6 +31,14 @@ func (app *App) Set(name string, f AppFunc) {
 	app.values[name] = f
 }
 
+func (app *App) Has(name string) bool {
+	if _, ok := app.values[name]; ok {
+		return true
+	}
+
+	return false
+}
+
 func (app *App) Get(name string) interface{} {
 	if _, ok := app.values[name]; !ok {
 		panic(fmt.Sprintf("The service does not exist: %s", name))

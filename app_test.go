@@ -78,3 +78,11 @@ func Test_GetKeys(t *testing.T) {
 	assert.Contains(t, app.GetKeys(), "user")
 	assert.Contains(t, app.GetKeys(), "user.reference")
 }
+
+func Test_Has(t *testing.T) {
+	app := NewApp()
+	app.Set("user", func(app *App) interface{} { return nil })
+
+	assert.True(t, app.Has("user"))
+	assert.False(t, app.Has("foobar"))
+}
