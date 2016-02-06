@@ -102,6 +102,7 @@ func (l *Lifecycle) execute(fs []LifecycleFun, app *App) {
 func (l *Lifecycle) Go(app *App) int {
 
 	app.state = Init
+
 	l.execute(l.init, app)
 
 	app.state = Register
@@ -129,6 +130,8 @@ func (l *Lifecycle) Go(app *App) int {
 				if r := recover(); r != nil {
 					message := fmt.Sprintf("Panic recovered, message=%s\n", r)
 					state.Error = errors.New(message + string(debug.Stack()[:]))
+
+					state.Out <- Control_Stop
 				}
 
 				wg.Done()
@@ -156,7 +159,7 @@ func (l *Lifecycle) Go(app *App) int {
 				continue
 			}
 
-			state.In <- 1
+			state.In <- Control_Stop
 		}
 	}(states)
 

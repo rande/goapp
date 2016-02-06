@@ -171,7 +171,7 @@ func Test_LifeCycle_Stop_Channel(t *testing.T) {
 	l.Run(func(app *App, state *GoroutineState) error {
 		time.Sleep(1000 * time.Millisecond)
 
-		state.Out <- 1
+		state.Out <- Control_Stop
 
 		return nil
 	})
