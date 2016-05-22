@@ -153,7 +153,6 @@ func (l *Lifecycle) Go(app *App) int {
 
 		chosen, _, _ := reflect.Select(cases)
 
-		fmt.Println("Sending exit signal to goroutine")
 		for pos, state := range states {
 			if pos == chosen {
 				continue
@@ -167,7 +166,6 @@ func (l *Lifecycle) Go(app *App) int {
 
 	hasError := false
 	for _, state := range states {
-
 		if state.Error != nil {
 
 			fmt.Printf(">>> Error: %s\n", state.Error)

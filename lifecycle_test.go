@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func ExampleLifecycle_BasicUsage() {
+func SampleLifecycle_BasicUsage() {
 	l := NewLifecycle()
 
 	l.Run(func(app *App, state *GoroutineState) error {

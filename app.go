@@ -2,6 +2,7 @@ package goapp
 
 import (
 	"fmt"
+	"sync"
 )
 
 // The structure contains all services build by the AppFunc function, the service is initialized when get Get
@@ -10,6 +11,7 @@ type App struct {
 	state    int
 	values   map[string]AppFunc     // contains the original closure to generate the service
 	services map[string]interface{} // contains the instantiated services
+	lock     sync.Mutex
 }
 
 type AppFunc func(app *App) interface{}
@@ -18,6 +20,7 @@ func NewApp() *App {
 	app := App{
 		services: make(map[string]interface{}),
 		values:   make(map[string]AppFunc),
+		lock:     sync.Mutex{},
 	}
 
 	return &app
@@ -44,6 +47,8 @@ func (app *App) Get(name string) interface{} {
 		panic(fmt.Sprintf("The service does not exist: %s", name))
 	}
 
+	app.lock.Lock()
+	defer app.lock.Unlock()
 	if _, ok := app.services[name]; !ok {
 		app.services[name] = app.values[name](app)
 	}
