@@ -118,6 +118,10 @@ func (l *Lifecycle) Go(app *App) int {
 
 	var wg sync.WaitGroup
 
+	for _, k := range app.GetKeys() {
+		app.Get(k)
+	}
+
 	// start a set of goroutine, and provide a GoroutingState struct to interact wih the In and Out channel
 	states := make([]*GoroutineState, len(l.run)) // create a pool of channel to handle message from tasks
 	for p, f := range l.run {

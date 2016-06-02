@@ -47,8 +47,6 @@ func (app *App) Get(name string) interface{} {
 		panic(fmt.Sprintf("The service does not exist: %s", name))
 	}
 
-	app.lock.Lock()
-	defer app.lock.Unlock()
 	if _, ok := app.services[name]; !ok {
 		app.services[name] = app.values[name](app)
 	}
